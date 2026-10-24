@@ -10,7 +10,7 @@ Custom integration + Lovelace card for **multiple shopping lists** with **per-it
 - Items: add, complete, delete (via `todo` entity + services)
 - Per-item `store_id` with store catalog (add / list / remove)
 - One `todo` entity per list (works with HA To-do and automations)
-- Minimal responsive Lovelace card: items, store badge, store filter
+- Responsive Lovelace card (phone-first): items, store badge, store filter, store picker on add, store management
 - Local config flow — no cloud
 
 ## Install
@@ -23,7 +23,7 @@ Custom integration + Lovelace card for **multiple shopping lists** with **per-it
 4. Restart Home Assistant  
 5. Settings → Devices & services → Add integration → **Shopping Lists (stores)**
 
-The Lovelace card is registered automatically by the integration (`/hass_shopping_list/hass-shopping-list-card.js`).
+The Lovelace card is registered automatically by the integration (`/hass_shopping_list/hass-shopping-list-card.js`). No manual resource entry needed.
 
 ### Manual
 
@@ -31,15 +31,26 @@ The Lovelace card is registered automatically by the integration (`/hass_shoppin
 2. Restart Home Assistant  
 3. Add the integration via the UI (same as step 5 above)
 
-## Example dashboard
+## Lovelace card — add to a dashboard
+
+Card type: `custom:hass-shopping-list-card`
+
+### Via UI
+
+1. Open a dashboard → **Edit** → **Add card**  
+2. Search for **Einkaufsliste (Läden)** / `hass-shopping-list-card`  
+3. Optionally set `title`, `list_id`, `show_completed`  
+4. Save
+
+### Via YAML
 
 ```yaml
 views:
-  - title: Shopping
+  - title: Einkaufen
     path: shopping
     cards:
       - type: custom:hass-shopping-list-card
-        title: Groceries
+        title: Einkaufsliste
         # Optional: pin a list id from hass_shopping_list.list_lists
         # list_id: abc123
         show_completed: false
@@ -47,15 +58,27 @@ views:
 
 If `list_id` is omitted, the card uses the first available list and lets you switch in the toolbar.
 
-You can also show the native todo entity:
+### Card usage (short)
+
+| On the card | What it does |
+|-------------|--------------|
+| List dropdown | Switch shopping list |
+| **All stores** / store filter | Show only items for one store |
+| Article + **Laden** dropdown + Hinzufügen | Add item with store assignment |
+| Checkbox / ✕ | Check off or remove an item |
+| Per-item store dropdown | Change store on an existing item (`set_item_store`) |
+| **Läden verwalten** | Add stores; delete with confirmation (`add_store` / `remove_store`) |
+
+Phone-first layout: add form stacks vertically on narrow screens; store management is collapsed by default to keep the list reachable.
+
+You can also show the native todo entity (no store UI there):
 
 ```yaml
 type: todo-list
 entity: todo.shopping
 ```
 
-Store badges only appear on the custom card (or via item `description` mirroring like `[Aldi]`).
-
+Store badges and store management only appear on the custom card (todo `description` may mirror `[Aldi]` for readability).
 ## Services
 
 Domain: `hass_shopping_list`
@@ -120,4 +143,4 @@ pytest
 
 ## License
 
-MIT (see repository license when published).
+GPL-3.0-or-later (see `LICENSE`).
