@@ -1,0 +1,129 @@
+add_item:
+  name: Add item
+  description: Add an item to a shopping list with optional store assignment.
+  fields:
+    list_id:
+      name: List ID
+      description: Target shopping list id.
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: Item name / summary.
+      required: true
+      example: Milk
+      selector:
+        text:
+    store_id:
+      name: Store ID
+      description: Optional store for this item (falls back to list default).
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      description: Optional quantity.
+      selector:
+        text:
+    note:
+      name: Note
+      description: Optional note.
+      selector:
+        text:
+
+set_item_store:
+  name: Set item store
+  description: Assign or clear the store for an existing item.
+  fields:
+    item_id:
+      name: Item ID
+      description: Item uid.
+      required: true
+      selector:
+        text:
+    store_id:
+      name: Store ID
+      description: Store id, or leave empty to clear.
+      selector:
+        text:
+
+add_store:
+  name: Add store
+  description: Add a store to the household catalog.
+  fields:
+    name:
+      name: Name
+      description: Store display name.
+      required: true
+      example: Aldi
+      selector:
+        text:
+    icon:
+      name: Icon
+      description: Optional Material Design icon (e.g. mdi:store).
+      selector:
+        icon:
+    color:
+      name: Color
+      description: Optional CSS color for badges.
+      selector:
+        text:
+
+list_stores:
+  name: List stores
+  description: Return the store catalog (response-only).
+
+remove_store:
+  name: Remove store
+  description: Remove a store and clear it from items.
+  fields:
+    store_id:
+      name: Store ID
+      required: true
+      selector:
+        text:
+
+create_list:
+  name: Create list
+  description: Create a new shopping list.
+  fields:
+    name:
+      name: Name
+      required: true
+      example: Weekly groceries
+      selector:
+        text:
+    default_store_id:
+      name: Default store ID
+      description: Optional default store for new items (Slice 1 UX).
+      selector:
+        text:
+
+rename_list:
+  name: Rename list
+  description: Rename an existing shopping list.
+  fields:
+    list_id:
+      name: List ID
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      required: true
+      selector:
+        text:
+
+delete_list:
+  name: Delete list
+  description: Delete a shopping list and all of its items.
+  fields:
+    list_id:
+      name: List ID
+      required: true
+      selector:
+        text:
+
+list_lists:
+  name: List lists
+  description: Return all shopping lists (response-only).
