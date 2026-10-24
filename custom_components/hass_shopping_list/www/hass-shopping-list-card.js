@@ -32,9 +32,12 @@ class HassShoppingListCard extends HTMLElement {
         "hass_shopping_list_updated"
       );
       this._load();
-    } else {
-      this._render();
+      return;
     }
+    // Do not re-render on every hass property update. HA pushes hass very often
+    // (any entity state change). Full innerHTML replace would recreate the add
+    // / store inputs and steal focus while typing. Card data refreshes via
+    // hass_shopping_list_updated → _load() instead.
   }
 
   getCardSize() {
@@ -244,11 +247,47 @@ class HassShoppingListCard extends HTMLElement {
     );
   }
 
+  /** Sync draft fields from live inputs and remember focus for restore. */
+  _captureFocus() {
+    const root = this.shadowRoot;
+    if (!root) return null;
+    const ae = root.activeElement;
+    if (!ae || !ae.id) return null;
+    if (ae.id === "newName") this._draftName = ae.value;
+    if (ae.id === "newStoreName") this._draftStoreName = ae.value;
+    if (ae.id === "newStore") this._draftStoreId = ae.value;
+    return {
+      id: ae.id,
+      start: typeof ae.selectionStart === "number" ? ae.selectionStart : null,
+      end: typeof ae.selectionEnd === "number" ? ae.selectionEnd : null,
+    };
+  }
+
+  _restoreFocus(focus) {
+    if (!focus?.id || !this.shadowRoot) return;
+    const el = this.shadowRoot.getElementById(focus.id);
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    if (
+      focus.start != null &&
+      focus.end != null &&
+      typeof el.setSelectionRange === "function"
+    ) {
+      try {
+        el.setSelectionRange(focus.start, focus.end);
+      } catch (_err) {
+        // Some input types reject setSelectionRange; ignore.
+      }
+    }
+  }
+
   _render() {
     if (!this._config) return;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
+
+    const focus = this._captureFocus();
 
     const list = this._list();
     const stores = this._data?.stores || [];
@@ -623,6 +662,7 @@ class HassShoppingListCard extends HTMLElement {
     `;
 
     this._bindEvents(items);
+    this._restoreFocus(focus);
   }
 
   _bindEvents(items) {
