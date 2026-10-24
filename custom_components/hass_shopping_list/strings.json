@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Shopping Lists",
+        "description": "Set up multi-list shopping with per-item store assignment. Data stays local on this Home Assistant instance."
+      }
+    },
+    "abort": {
+      "already_configured": "Shopping Lists is already configured."
+    }
+  },
+  "entity": {
+    "todo": {
+      "shopping_list": {
+        "name": "{name}"
+      }
+    }
+  }
+}

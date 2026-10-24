@@ -1,0 +1,11 @@
+{
+  "domain": "hass_shopping_list",
+  "name": "Shopping Lists (stores)",
+  "codeowners": ["@MartinSchillinger"],
+  "config_flow": true,
+  "documentation": "https://github.com/MartinSchillinger/hass-shopping-list",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/MartinSchillinger/hass-shopping-list/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
