@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Shopping Lists (stores)">
+  <title>Shopping Lists (stores)</title>
+  <rect x="4" y="4" width="248" height="248" rx="52" fill="#0e747a"/>
+  <path d="M90 118c0-34 20-56 38-56s38 22 38 56" fill="none" stroke="#f5b460" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="90" cy="119" r="9" fill="#e89538"/>
+  <circle cx="166" cy="119" r="9" fill="#e89538"/>
+  <rect x="50" y="112" width="156" height="20" rx="10" fill="#e89538"/>
+  <polygon points="64,124 192,124 178,202 78,202" fill="#e89538"/>
+  <polygon points="74,138 182,138 170,190 86,190" fill="#b86e1c"/>
+  <g stroke="#f5b460" stroke-width="3" stroke-opacity="0.55" stroke-linecap="round">
+    <line x1="90" y1="142" x2="92" y2="186"/>
+    <line x1="104" y1="142" x2="104" y2="186"/>
+    <line x1="118" y1="142" x2="118" y2="186"/>
+    <line x1="132" y1="142" x2="132" y2="186"/>
+    <line x1="146" y1="142" x2="146" y2="186"/>
+    <line x1="160" y1="142" x2="158" y2="186"/>
+  </g>
+  <rect x="94" y="66" width="76" height="72" rx="8" fill="#fffbf4"/>
+  <g fill="none" stroke="#0e747a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="108" cy="84" r="6"/>
+    <path d="M104 84l3.5 3.5 7-7"/>
+    <circle cx="108" cy="100" r="6"/>
+    <path d="M104 100l3.5 3.5 7-7"/>
+    <circle cx="108" cy="116" r="6"/>
+  </g>
+  <g fill="#bab0a0">
+    <rect x="120" y="81" width="38" height="6" rx="2"/>
+    <rect x="120" y="97" width="38" height="6" rx="2"/>
+    <rect x="120" y="113" width="38" height="6" rx="2"/>
+  </g>
+</svg>

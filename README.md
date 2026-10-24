@@ -1,6 +1,13 @@
 # Shopping Lists (stores) for Home Assistant
 
+<p align="center">
+  <img src="brand/icon.png" alt="Shopping Lists (stores) icon" width="128" height="128">
+</p>
+
 Custom integration + Lovelace cards for **multiple shopping lists** with **per-item store assignment** (e.g. potatoes → Aldi, bacon → Edeka). Filter any list by store. Data stays local in Home Assistant (`.storage/`).
+
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/MartinSchillinger/hass-shopping-list)](https://github.com/MartinSchillinger/hass-shopping-list/releases)
 
 > Slice 0: single-user foundation. Sharing ACL fields exist in storage (`owner_user_id`, `allowed_users`) but enforcement / share UI is Slice 1.
 
@@ -15,21 +22,43 @@ Custom integration + Lovelace cards for **multiple shopping lists** with **per-i
 
 ## Install
 
+This repo is a **HACS custom repository** (not in the default HACS store until submitted to `hacs/default`). Add it once as a custom repo, then install/update like any other HACS integration.
+
 ### HACS (recommended)
 
-1. HACS → Integrations → ⋮ → Custom repositories  
-2. Add `https://github.com/MartinSchillinger/hass-shopping-list` as **Integration**  
-3. Install **Shopping Lists (stores)**  
-4. Restart Home Assistant  
-5. Settings → Devices & services → Add integration → **Shopping Lists (stores)**
+1. Open **HACS** → **Integrations** (or **Discover** / the three-dot menu, depending on your HACS version)  
+2. Open **⋮** → **Custom repositories**  
+3. Repository: `https://github.com/MartinSchillinger/hass-shopping-list`  
+4. Category / Type: **Integration** → **Add**  
+5. Find **Shopping Lists (stores)** in HACS → **Download** / **Install**  
+6. **Restart Home Assistant**  
+7. **Settings → Devices & services → Add integration → Shopping Lists (stores)**
+
+After install, HACS and Home Assistant load the brand icon from the integration’s `brand/` folder (see [Branding](#branding)). If HACS still shows a placeholder, refresh the browser or restart once after download.
 
 The Lovelace cards are registered automatically by the integration (`/hass_shopping_list/hass-shopping-list-card.js?v=…`). In **storage mode** (default) it is added as a Lovelace module resource (same path HACS uses). In **YAML mode** it falls back to `frontend.add_extra_js_url`. No manual resource entry needed for storage mode.
 
 ### Manual
 
-1. Copy `custom_components/hass_shopping_list/` into your HA `config/custom_components/` directory  
+1. Copy `custom_components/hass_shopping_list/` (including the `brand/` directory) into your HA `config/custom_components/` directory  
 2. Restart Home Assistant  
-3. Add the integration via the UI (same as step 5 above)
+3. Add the integration via the UI (same as step 7 above)
+
+## Branding
+
+Brand assets follow current HACS + Home Assistant custom-integration conventions:
+
+| Path | Purpose |
+|------|---------|
+| `custom_components/hass_shopping_list/brand/icon.png` | Square icon (256×256) — **required by HACS** validation |
+| `…/brand/icon@2x.png` | 512×512 |
+| `…/brand/logo.png` (+ `@2x`) | Wider logo for the integration page |
+| `…/brand/dark_*` | Dark-theme variants |
+| `brand/icon.svg` | Editable SVG source (also under the integration `brand/` folder) |
+
+Home Assistant **Settings → Devices & services** uses these files automatically on **HA 2026.3+** (`/api/brands/integration/hass_shopping_list/…`). Older HA versions show a placeholder until you upgrade; the `home-assistant/brands` CDN no longer accepts new custom-integration icons.
+
+No paid services or external brand hosting are required.
 
 ## Lovelace cards — add to a dashboard
 
