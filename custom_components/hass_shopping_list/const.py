@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 DOMAIN = "hass_shopping_list"
+
+_MANIFEST_PATH = Path(__file__).parent / "manifest.json"
+try:
+    INTEGRATION_VERSION = json.loads(
+        _MANIFEST_PATH.read_text(encoding="utf-8")
+    ).get("version", "0.0.0")
+except (OSError, json.JSONDecodeError):
+    INTEGRATION_VERSION = "0.0.0"
 
 STORAGE_KEY = "hass_shopping_list"
 STORAGE_VERSION = 1
@@ -29,4 +40,13 @@ SERVICE_LIST_LISTS = "list_lists"
 
 EVENT_UPDATED = "hass_shopping_list_updated"
 
-FRONTEND_SCRIPT_URL = f"/{DOMAIN}/hass-shopping-list-card.js"
+# Path without cache-bust query (used to match existing Lovelace resources).
+FRONTEND_SCRIPT_PATH = f"/{DOMAIN}/hass-shopping-list-card.js"
+# Back-compat alias; prefer versioned_frontend_script_url() at registration time.
+FRONTEND_SCRIPT_URL = FRONTEND_SCRIPT_PATH
+
+
+def versioned_frontend_script_url(version: str | None = None) -> str:
+    """Return the card module URL with a ?v= cache-buster."""
+    ver = version or INTEGRATION_VERSION
+    return f"{FRONTEND_SCRIPT_PATH}?v={ver}"

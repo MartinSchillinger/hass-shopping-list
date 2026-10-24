@@ -23,7 +23,7 @@ Custom integration + Lovelace card for **multiple shopping lists** with **per-it
 4. Restart Home Assistant  
 5. Settings → Devices & services → Add integration → **Shopping Lists (stores)**
 
-The Lovelace card is registered automatically by the integration (`/hass_shopping_list/hass-shopping-list-card.js`). No manual resource entry needed.
+The Lovelace card is registered automatically by the integration (`/hass_shopping_list/hass-shopping-list-card.js?v=…`). In **storage mode** (default) it is added as a Lovelace module resource (same path HACS uses). In **YAML mode** it falls back to `frontend.add_extra_js_url`. No manual resource entry needed for storage mode.
 
 ### Manual
 
@@ -35,7 +35,7 @@ The Lovelace card is registered automatically by the integration (`/hass_shoppin
 
 Card type: `custom:hass-shopping-list-card`
 
-The integration serves the card at `/hass_shopping_list/hass-shopping-list-card.js` and registers it with `frontend.add_extra_js_url` (loaded as a frontend module). The script pushes an entry to `window.customCards` so it appears under **Add card → By card / Nach Karte** (Community / custom cards).
+The integration serves the card at `/hass_shopping_list/hass-shopping-list-card.js` and auto-registers it so Lovelace **awaits** the module before rendering (avoids “Custom element doesn't exist” after restart). The script pushes an entry to `window.customCards` so it appears under **Add card → By card / Nach Karte**.
 
 ### Via UI (card picker)
 
@@ -45,7 +45,16 @@ The integration serves the card at `/hass_shopping_list/hass-shopping-list-card.
 4. Search **shop**, **Einkauf**, **Laden**, or **hass-shopping-list** — pick **Einkaufsliste / Shopping List …**  
 5. Optionally set `title`, `list_id`, `show_completed` → Save  
 
-If search still finds nothing: open `/hass_shopping_list/hass-shopping-list-card.js` in the browser (should show JS source). In DevTools console, check `window.customCards` for `type: "hass-shopping-list-card"`. Or add via Manual YAML (below).
+### Card missing / “Custom element doesn't exist” (recovery)
+
+1. Confirm `custom_components/hass_shopping_list/www/hass-shopping-list-card.js` is present on the HA host (update/pull the integration if not)  
+2. **Restart Home Assistant** (Settings → System → Restart)  
+3. **Hard-reload** the browser or Companion WebView (Ctrl+Shift+R); on iOS Companion: close the app fully and reopen  
+4. Open `http(s)://YOUR-HA/hass_shopping_list/hass-shopping-list-card.js` — expect **HTTP 200** and JavaScript source (not 404)  
+5. Settings → Dashboards → **Resources** — look for `/hass_shopping_list/hass-shopping-list-card.js?v=…` type **JavaScript Module**. If missing (YAML mode), add it manually, then hard-reload again  
+6. DevTools console: `customElements.get("hass-shopping-list-card")` should be a function; `window.customCards` should list `type: "hass-shopping-list-card"`
+
+If search still finds nothing after that: use Manual YAML (below).
 
 ### Via YAML (Manual)
 

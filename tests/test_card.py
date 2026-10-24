@@ -11,11 +11,16 @@ import pytest
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.hass_shopping_list import _async_register_frontend
+from custom_components.hass_shopping_list import (
+    _async_register_frontend,
+    _lovelace_storage_resources,
+)
 from custom_components.hass_shopping_list.const import (
     DOMAIN,
     EVENT_UPDATED,
-    FRONTEND_SCRIPT_URL,
+    FRONTEND_SCRIPT_PATH,
+    INTEGRATION_VERSION,
+    versioned_frontend_script_url,
 )
 from custom_components.hass_shopping_list.websocket_api import websocket_get_data
 
@@ -160,14 +165,19 @@ async def test_update_event_fired_for_card_refresh(
 
 
 @pytest.mark.asyncio
-async def test_frontend_card_path_registered(hass: HomeAssistant) -> None:
-    """Integration registers the static card URL for Lovelace."""
+async def test_frontend_card_path_registered_yaml_fallback(
+    hass: HomeAssistant,
+) -> None:
+    """Without Lovelace storage resources, fall back to add_extra_js_url."""
     mock_http = SimpleNamespace(
         async_register_static_paths=AsyncMock(),
     )
-    # HomeAssistant.http is normally set by the http component
     object.__setattr__(hass, "http", mock_http)
+    hass.data.pop(f"{DOMAIN}_static_registered", None)
+    hass.data.pop(f"{DOMAIN}_frontend_resource_registered", None)
+    hass.data.pop("lovelace", None)
 
+    expected = versioned_frontend_script_url(INTEGRATION_VERSION)
     with patch(
         "custom_components.hass_shopping_list.frontend.add_extra_js_url"
     ) as mock_js:
@@ -176,4 +186,105 @@ async def test_frontend_card_path_registered(hass: HomeAssistant) -> None:
     mock_http.async_register_static_paths.assert_awaited()
     paths = mock_http.async_register_static_paths.await_args.args[0]
     assert paths[0].url_path == f"/{DOMAIN}"
-    mock_js.assert_called_once_with(hass, FRONTEND_SCRIPT_URL)
+    mock_js.assert_called_once_with(hass, expected)
+    assert hass.data[f"{DOMAIN}_frontend_resource_registered"] == "extra_js"
+    # Second call is idempotent (no duplicate static/module registration).
+    with patch(
+        "custom_components.hass_shopping_list.frontend.add_extra_js_url"
+    ) as mock_js2:
+        await _async_register_frontend(hass)
+    mock_js2.assert_not_called()
+    assert mock_http.async_register_static_paths.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_frontend_registers_lovelace_storage_resource(
+    hass: HomeAssistant,
+) -> None:
+    """Storage-mode Lovelace gets a module resource (awaited by the dashboard)."""
+    mock_http = SimpleNamespace(
+        async_register_static_paths=AsyncMock(),
+    )
+    object.__setattr__(hass, "http", mock_http)
+    hass.data.pop(f"{DOMAIN}_static_registered", None)
+    hass.data.pop(f"{DOMAIN}_frontend_resource_registered", None)
+
+    resources = SimpleNamespace(
+        loaded=True,
+        store=SimpleNamespace(key="lovelace_resources", version=1),
+        async_items=MagicMock(return_value=[]),
+        async_create_item=AsyncMock(),
+        async_update_item=AsyncMock(),
+        async_load=AsyncMock(),
+    )
+    hass.data["lovelace"] = SimpleNamespace(resources=resources, resource_mode="storage")
+
+    expected = versioned_frontend_script_url(INTEGRATION_VERSION)
+    with patch(
+        "custom_components.hass_shopping_list.frontend.add_extra_js_url"
+    ) as mock_js:
+        await _async_register_frontend(hass)
+
+    mock_js.assert_not_called()
+    resources.async_create_item.assert_awaited_once_with(
+        {"res_type": "module", "url": expected}
+    )
+    assert hass.data[f"{DOMAIN}_frontend_resource_registered"] == "lovelace"
+
+
+@pytest.mark.asyncio
+async def test_frontend_updates_stale_lovelace_resource(
+    hass: HomeAssistant,
+) -> None:
+    """Existing resource URL is updated when the integration version changes."""
+    mock_http = SimpleNamespace(
+        async_register_static_paths=AsyncMock(),
+    )
+    object.__setattr__(hass, "http", mock_http)
+    hass.data.pop(f"{DOMAIN}_static_registered", None)
+    hass.data.pop(f"{DOMAIN}_frontend_resource_registered", None)
+
+    resources = SimpleNamespace(
+        loaded=False,
+        store=SimpleNamespace(key="lovelace_resources", version=1),
+        async_items=MagicMock(
+            return_value=[
+                {
+                    "id": "res1",
+                    "url": f"{FRONTEND_SCRIPT_PATH}?v=0.0.1",
+                    "type": "module",
+                }
+            ]
+        ),
+        async_create_item=AsyncMock(),
+        async_update_item=AsyncMock(),
+        async_load=AsyncMock(),
+    )
+    hass.data["lovelace"] = SimpleNamespace(resources=resources, resource_mode="storage")
+
+    expected = versioned_frontend_script_url(INTEGRATION_VERSION)
+    await _async_register_frontend(hass)
+
+    resources.async_load.assert_awaited()
+    resources.async_update_item.assert_awaited_once_with(
+        "res1", {"res_type": "module", "url": expected}
+    )
+    resources.async_create_item.assert_not_called()
+
+
+def test_lovelace_storage_resources_skips_yaml_mode(hass: HomeAssistant) -> None:
+    """YAML resource collections (no store) are not treated as writable."""
+    yaml_resources = SimpleNamespace(loaded=True, store=None, async_items=list)
+    hass.data["lovelace"] = SimpleNamespace(resources=yaml_resources)
+    assert _lovelace_storage_resources(hass) is None
+
+    hass.data["lovelace"] = {"resources": None}
+    assert _lovelace_storage_resources(hass) is None
+
+
+def test_versioned_frontend_script_url() -> None:
+    """Cache-bust query uses the manifest version."""
+    url = versioned_frontend_script_url("9.9.9")
+    assert url == f"{FRONTEND_SCRIPT_PATH}?v=9.9.9"
+    assert INTEGRATION_VERSION
+    assert versioned_frontend_script_url().endswith(f"?v={INTEGRATION_VERSION}")
