@@ -77,3 +77,69 @@ async def test_storage_key_uses_ha_store(hass: HomeAssistant) -> None:
     assert data is not None
     assert "lists" in data and "stores" in data and "items" in data
     assert data["lists"][0]["name"] == "A"
+
+
+@pytest.mark.asyncio
+async def test_rename_and_delete_list_persists(hass: HomeAssistant) -> None:
+    """Rename/delete list (and cascade items) survive reload."""
+    store = ShoppingListStore(hass)
+    await store.async_load()
+    lst = await store.async_create_list("Temp", owner_user_id="u")
+    await store.async_add_item(lst["list_id"], "Eggs")
+
+    renamed = await store.async_rename_list(lst["list_id"], "Renamed")
+    assert renamed["name"] == "Renamed"
+
+    reloaded = ShoppingListStore(hass)
+    await reloaded.async_load()
+    assert reloaded.get_list(lst["list_id"])["name"] == "Renamed"
+    assert len(reloaded.items_for_list(lst["list_id"])) == 1
+
+    await reloaded.async_delete_list(lst["list_id"])
+    again = ShoppingListStore(hass)
+    await again.async_load()
+    assert again.get_list(lst["list_id"]) is None
+    assert again.items_for_list(lst["list_id"]) == []
+
+
+@pytest.mark.asyncio
+async def test_remove_store_clears_item_and_default(hass: HomeAssistant) -> None:
+    """Removing a store clears item store_id and list default_store_id."""
+    store = ShoppingListStore(hass)
+    await store.async_load()
+    shop = await store.async_add_store("Aldi")
+    lst = await store.async_create_list(
+        "G", owner_user_id="u", default_store_id=shop["store_id"]
+    )
+    item = await store.async_add_item(lst["list_id"], "Milk")
+    assert item["store_id"] == shop["store_id"]
+
+    await store.async_remove_store(shop["store_id"])
+    assert store.get_store(shop["store_id"]) is None
+    assert store.get_item(item["uid"])["store_id"] is None
+    assert store.get_list(lst["list_id"])["default_store_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_ensure_default_list_once(hass: HomeAssistant) -> None:
+    """Empty storage gets one default Shopping list; second call is a no-op."""
+    store = ShoppingListStore(hass)
+    await store.async_load()
+    first = await store.async_ensure_default_list(owner_user_id="owner")
+    assert first["name"] == "Shopping"
+    assert first["owner_user_id"] == "owner"
+    assert first["allowed_users"] == []
+
+    second = await store.async_ensure_default_list(owner_user_id="other")
+    assert second["list_id"] == first["list_id"]
+    assert len(store.lists) == 1
+
+
+@pytest.mark.asyncio
+async def test_add_item_rejects_unknown_store(hass: HomeAssistant) -> None:
+    """Unknown store_id raises KeyError."""
+    store = ShoppingListStore(hass)
+    await store.async_load()
+    lst = await store.async_create_list("G", owner_user_id="u")
+    with pytest.raises(KeyError, match="Store"):
+        await store.async_add_item(lst["list_id"], "X", store_id="missing")
