@@ -65,7 +65,34 @@ add_store:
         icon:
     color:
       name: Color
-      description: Optional CSS color for badges.
+      description: Optional CSS color for badges (e.g. #1e88e5). Omit for default slate.
+      example: "#1e88e5"
+      selector:
+        text:
+
+update_store:
+  name: Update store
+  description: Update name, icon, and/or color of an existing store.
+  fields:
+    store_id:
+      name: Store ID
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: New display name.
+      selector:
+        text:
+    icon:
+      name: Icon
+      description: Material Design icon, or empty to clear.
+      selector:
+        icon:
+    color:
+      name: Color
+      description: CSS color for badges (e.g. #1e88e5), or empty to use the default.
+      example: "#43a047"
       selector:
         text:
 

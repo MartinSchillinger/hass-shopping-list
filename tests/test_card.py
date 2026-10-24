@@ -59,12 +59,22 @@ def test_lovelace_card_file_defines_custom_element() -> None:
     assert 'class="badge"' in source
     assert 'callService("hass_shopping_list", "add_item"' in source
     assert 'callService("hass_shopping_list", "add_store"' in source
+    assert 'callService("hass_shopping_list", "update_store"' in source
     # Edit modal on the list card (no per-row store dropdown).
     assert 'id="editName"' in source
     assert 'id="editStore"' in source
     assert 'id="editSave"' in source
     assert "itemStore" not in source
     assert "Läden verwalten" not in source
+    # Store colors: curated palette + contrast-aware badges.
+    assert "HSL_STORE_PALETTE" in source
+    assert "_hslBadgeStyle" in source
+    assert "_hslContrastText" in source
+    assert '"newStoreColor"' in source
+    assert '"editStoreColor"' in source
+    assert 'id="editStoreSave"' in source
+    assert "HSL_DEFAULT_STORE_COLOR" in source
+    assert "_hslPaletteHtml" in source
     # Broken visual editor stub must not be registered (picker falls back to YAML).
     assert "hass-shopping-list-card-editor" not in source
 
@@ -100,6 +110,7 @@ def test_card_preserves_input_focus_across_updates() -> None:
     assert 'this._draftName = ev.target.value' in source
     assert 'this._draftStoreName = ev.target.value' in source
     assert 'this._editName = ev.target.value' in source
+    assert 'this._editStoreName = ev.target.value' in source
 
 
 @pytest.mark.asyncio

@@ -39,6 +39,95 @@ function _hslStoreOptionsHtml(
   );
 }
 
+/** Curated phone-friendly palette (hex). First entry is the default slate. */
+const HSL_STORE_PALETTE = [
+  { id: "slate", hex: "#546e7a", label: "Schiefer" },
+  { id: "red", hex: "#e53935", label: "Rot" },
+  { id: "orange", hex: "#fb8c00", label: "Orange" },
+  { id: "amber", hex: "#f9a825", label: "Amber" },
+  { id: "green", hex: "#43a047", label: "Grün" },
+  { id: "teal", hex: "#00897b", label: "Petrol" },
+  { id: "blue", hex: "#1e88e5", label: "Blau" },
+  { id: "indigo", hex: "#3949ab", label: "Indigo" },
+  { id: "purple", hex: "#8e24aa", label: "Lila" },
+  { id: "brown", hex: "#6d4c41", label: "Braun" },
+];
+
+const HSL_DEFAULT_STORE_COLOR = HSL_STORE_PALETTE[0].hex;
+
+function _hslParseHex(color) {
+  if (!color || typeof color !== "string") return null;
+  let hex = color.trim();
+  if (hex.startsWith("#")) hex = hex.slice(1);
+  if (hex.length === 3) {
+    hex = hex
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+    hex: `#${hex.toLowerCase()}`,
+  };
+}
+
+function _hslContrastText(bgHex) {
+  const rgb = _hslParseHex(bgHex);
+  if (!rgb) return "#ffffff";
+  // Relative luminance (sRGB) — light text on dark, dark text on light.
+  const toLin = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const L =
+    0.2126 * toLin(rgb.r) + 0.7152 * toLin(rgb.g) + 0.0722 * toLin(rgb.b);
+  return L > 0.45 ? "#111111" : "#ffffff";
+}
+
+function _hslResolveStoreColor(store) {
+  const raw = store?.color;
+  if (raw && String(raw).trim()) return String(raw).trim();
+  return HSL_DEFAULT_STORE_COLOR;
+}
+
+/** Inline style for store pills — works on dark HA themes via contrast text + border. */
+function _hslBadgeStyle(storeOrColor) {
+  const color =
+    typeof storeOrColor === "string"
+      ? storeOrColor || HSL_DEFAULT_STORE_COLOR
+      : _hslResolveStoreColor(storeOrColor);
+  const parsed = _hslParseHex(color);
+  const bg = parsed ? parsed.hex : HSL_DEFAULT_STORE_COLOR;
+  const fg = _hslContrastText(bg);
+  return `background:${_hslEsc(bg)};color:${_hslEsc(
+    fg
+  )};border:1px solid color-mix(in srgb, ${_hslEsc(bg)} 70%, ${
+    fg === "#111111" ? "#000" : "#fff"
+  });`;
+}
+
+function _hslPaletteHtml(selectedHex, inputId) {
+  const selected = (selectedHex || HSL_DEFAULT_STORE_COLOR).toLowerCase();
+  return `<div class="palette" role="radiogroup" aria-label="Ladenfarbe">
+    ${HSL_STORE_PALETTE.map((swatch) => {
+      const active = swatch.hex.toLowerCase() === selected ? "is-active" : "";
+      return `<button type="button" class="swatch ${active}" data-color="${_hslEsc(
+        swatch.hex
+      )}" data-palette-for="${_hslEsc(inputId)}" title="${_hslEsc(
+        swatch.label
+      )}" aria-label="${_hslEsc(swatch.label)}" aria-pressed="${
+        active ? "true" : "false"
+      }" style="background:${_hslEsc(swatch.hex)}"></button>`;
+    }).join("")}
+  </div>
+  <input type="hidden" id="${_hslEsc(inputId)}" value="${_hslEsc(
+    selectedHex || HSL_DEFAULT_STORE_COLOR
+  )}" />`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Shopping list card                                                   */
 /* ------------------------------------------------------------------ */
@@ -488,15 +577,15 @@ class HassShoppingListCard extends HTMLElement {
         .badge {
           flex: 0 0 auto;
           font-size: 0.75rem;
+          font-weight: 600;
           line-height: 1.2;
           padding: 3px 8px;
           border-radius: 999px;
-          background: var(--secondary-background-color, #eee);
-          color: var(--secondary-text-color);
           max-width: 42%;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          box-sizing: border-box;
         }
         .empty, .error, .hint {
           opacity: 0.75;
@@ -641,11 +730,9 @@ class HassShoppingListCard extends HTMLElement {
                         item.name
                       )}</span>${
                         store
-                          ? ` <span class="badge" style="${
-                              store.color
-                                ? `background:${_hslEsc(store.color)};color:#fff;`
-                                : ""
-                            }">${_hslEsc(store.name)}</span>`
+                          ? ` <span class="badge" style="${_hslBadgeStyle(
+                              store
+                            )}">${_hslEsc(store.name)}</span>`
                           : ""
                       }
                     </div>
@@ -794,6 +881,10 @@ class HassShoppingListStoresCard extends HTMLElement {
     }
     this._config = { ...config };
     this._draftStoreName = this._draftStoreName || "";
+    this._draftStoreColor = this._draftStoreColor || HSL_DEFAULT_STORE_COLOR;
+    this._editStore = this._editStore || null;
+    this._editStoreName = this._editStoreName || "";
+    this._editStoreColor = this._editStoreColor || HSL_DEFAULT_STORE_COLOR;
     this._busy = false;
     this._render();
   }
@@ -858,11 +949,57 @@ class HassShoppingListStoresCard extends HTMLElement {
   async _addStore() {
     const name = (this._draftStoreName || "").trim();
     if (!name) return;
+    const color = this._draftStoreColor || HSL_DEFAULT_STORE_COLOR;
     await this._withBusy(async () => {
       await this._hass.callService("hass_shopping_list", "add_store", {
         name,
+        color,
       });
       this._draftStoreName = "";
+      this._draftStoreColor = HSL_DEFAULT_STORE_COLOR;
+    });
+  }
+
+  async _saveEditStore() {
+    const store = this._editStore;
+    if (!store) return;
+    const name = (this._editStoreName || "").trim();
+    if (!name) {
+      this._error = "Name darf nicht leer sein.";
+      this._render();
+      return;
+    }
+    const color = this._editStoreColor || HSL_DEFAULT_STORE_COLOR;
+    await this._withBusy(async () => {
+      await this._hass.callService("hass_shopping_list", "update_store", {
+        store_id: store.store_id,
+        name,
+        color,
+      });
+      this._editStore = null;
+      this._editStoreName = "";
+      this._editStoreColor = HSL_DEFAULT_STORE_COLOR;
+    });
+  }
+
+  _closeEditStore() {
+    this._editStore = null;
+    this._editStoreName = "";
+    this._editStoreColor = HSL_DEFAULT_STORE_COLOR;
+    this._render();
+  }
+
+  _openEditStore(store) {
+    this._editStore = store;
+    this._editStoreName = store.name || "";
+    this._editStoreColor = _hslResolveStoreColor(store);
+    this._render();
+    requestAnimationFrame(() => {
+      const input = this.shadowRoot?.getElementById("editStoreName");
+      if (input) {
+        input.focus({ preventScroll: true });
+        if (typeof input.select === "function") input.select();
+      }
     });
   }
 
@@ -875,6 +1012,9 @@ class HassShoppingListStoresCard extends HTMLElement {
       await this._hass.callService("hass_shopping_list", "remove_store", {
         store_id: storeId,
       });
+      if (this._editStore?.store_id === storeId) {
+        this._editStore = null;
+      }
     });
   }
 
@@ -884,6 +1024,11 @@ class HassShoppingListStoresCard extends HTMLElement {
     const ae = root.activeElement;
     if (!ae || !ae.id) return null;
     if (ae.id === "newStoreName") this._draftStoreName = ae.value;
+    if (ae.id === "editStoreName") this._editStoreName = ae.value;
+    const newColor = root.getElementById("newStoreColor");
+    if (newColor) this._draftStoreColor = newColor.value;
+    const editColor = root.getElementById("editStoreColor");
+    if (editColor) this._editStoreColor = editColor.value;
     return {
       id: ae.id,
       start: typeof ae.selectionStart === "number" ? ae.selectionStart : null,
@@ -909,6 +1054,18 @@ class HassShoppingListStoresCard extends HTMLElement {
     }
   }
 
+  _bindPalette(root, inputId, onChange) {
+    const input = root.getElementById(inputId);
+    root.querySelectorAll(`[data-palette-for="${inputId}"]`).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const color = btn.getAttribute("data-color");
+        if (input) input.value = color;
+        onChange(color);
+        this._render();
+      });
+    });
+  }
+
   _render() {
     if (!this._config) return;
     if (!this.shadowRoot) {
@@ -919,6 +1076,7 @@ class HassShoppingListStoresCard extends HTMLElement {
     const stores = this._data?.stores || [];
     const title = this._config.title || "Läden";
     const busy = this._busy ? "is-busy" : "";
+    const editing = this._editStore;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -942,15 +1100,49 @@ class HassShoppingListStoresCard extends HTMLElement {
           font-weight: 500;
           letter-spacing: 0.01em;
         }
+        .create-block {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
         .toolbar {
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
-          margin-bottom: 12px;
         }
         .toolbar input[type="text"] {
           flex: 1 1 160px;
           min-width: 0;
+        }
+        .field-label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--secondary-text-color);
+          margin: 0;
+        }
+        .palette {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .swatch {
+          width: 36px;
+          height: 36px;
+          min-height: 36px;
+          min-width: 36px;
+          padding: 0;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+          cursor: pointer;
+        }
+        .swatch.is-active {
+          border-color: var(--primary-text-color);
+          box-shadow:
+            inset 0 0 0 1px rgba(0, 0, 0, 0.2),
+            0 0 0 2px var(--card-background-color, #fff),
+            0 0 0 4px var(--primary-color);
         }
         input[type="text"] {
           box-sizing: border-box;
@@ -1006,6 +1198,24 @@ class HassShoppingListStoresCard extends HTMLElement {
           border-radius: 10px;
           background: var(--secondary-background-color, rgba(0,0,0,0.04));
         }
+        .store-main {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          border-radius: 8px;
+          padding: 2px 4px;
+          margin: -2px -4px;
+        }
+        .store-main:hover {
+          background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+        }
+        .store-main:focus-visible {
+          outline: 2px solid var(--primary-color);
+          outline-offset: 2px;
+        }
         .store-row .label {
           flex: 1;
           min-width: 0;
@@ -1015,15 +1225,15 @@ class HassShoppingListStoresCard extends HTMLElement {
         .badge {
           flex: 0 0 auto;
           font-size: 0.75rem;
+          font-weight: 600;
           line-height: 1.2;
           padding: 3px 8px;
           border-radius: 999px;
-          background: var(--secondary-background-color, #eee);
-          color: var(--secondary-text-color);
           max-width: 42%;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          box-sizing: border-box;
         }
         .empty, .error, .hint {
           opacity: 0.75;
@@ -1032,6 +1242,48 @@ class HassShoppingListStoresCard extends HTMLElement {
           line-height: 1.4;
         }
         .error { color: var(--error-color, #c00); opacity: 1; }
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          background: rgba(0, 0, 0, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          box-sizing: border-box;
+        }
+        .modal {
+          width: min(100%, 360px);
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color);
+          border-radius: var(--ha-card-border-radius, 12px);
+          box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+          padding: 16px;
+          border: 1px solid var(--divider-color);
+        }
+        .modal h3 {
+          margin: 0 0 12px;
+          font-size: 1.1rem;
+          font-weight: 500;
+        }
+        .modal .field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .modal label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--secondary-text-color);
+        }
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 4px;
+        }
         @media (min-width: 600px) {
           .card { padding: 16px 18px 18px; }
           h2 { font-size: 1.3rem; }
@@ -1044,11 +1296,15 @@ class HassShoppingListStoresCard extends HTMLElement {
             ? `<div class="error">${_hslEsc(this._error)}</div>`
             : ""
         }
-        <div class="toolbar">
-          <input id="newStoreName" type="text" placeholder="Neuer Laden (z. B. Aldi)" value="${_hslEsc(
-            this._draftStoreName || ""
-          )}" autocomplete="off" enterkeyhint="done" />
-          <button id="addStoreBtn" type="button">Laden anlegen</button>
+        <div class="create-block">
+          <div class="toolbar">
+            <input id="newStoreName" type="text" placeholder="Neuer Laden (z. B. Aldi)" value="${_hslEsc(
+              this._draftStoreName || ""
+            )}" autocomplete="off" enterkeyhint="done" />
+            <button id="addStoreBtn" type="button">Laden anlegen</button>
+          </div>
+          <p class="field-label">Farbe</p>
+          ${_hslPaletteHtml(this._draftStoreColor, "newStoreColor")}
         </div>
         ${
           stores.length === 0
@@ -1059,20 +1315,43 @@ class HassShoppingListStoresCard extends HTMLElement {
                 (s) => `<div class="store-row" data-store-id="${_hslEsc(
                   s.store_id
                 )}">
-                <span class="badge" style="${
-                  s.color
-                    ? `background:${_hslEsc(s.color)};color:#fff;`
-                    : ""
-                }">${_hslEsc(s.name)}</span>
-                <span class="label">${_hslEsc(s.name)}</span>
+                <div class="store-main" role="button" tabindex="0" aria-label="Laden bearbeiten">
+                  <span class="badge" style="${_hslBadgeStyle(s)}">${_hslEsc(
+                    s.name
+                  )}</span>
+                  <span class="label">${_hslEsc(s.name)}</span>
+                </div>
                 <button type="button" class="ghost danger icon store-remove" aria-label="Laden löschen">✕</button>
               </div>`
               )
               .join("")}
           </div>`
         }
-        <div class="hint">Läden erscheinen in der Einkaufslisten-Karte als Filter, Badge und Auswahl beim Hinzufügen/Bearbeiten.</div>
+        <div class="hint">Farbe wählen → Laden anlegen. Tippen auf einen Laden ändert Name und Farbe. Badges erscheinen in der Einkaufslisten-Karte.</div>
       </div>
+      ${
+        editing
+          ? `<div class="modal-backdrop" id="editStoreBackdrop" role="presentation">
+              <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editStoreTitle">
+                <h3 id="editStoreTitle">Laden bearbeiten</h3>
+                <div class="field">
+                  <label for="editStoreName">Name</label>
+                  <input id="editStoreName" type="text" value="${_hslEsc(
+                    this._editStoreName || ""
+                  )}" autocomplete="off" enterkeyhint="done" />
+                </div>
+                <div class="field">
+                  <span class="field-label" id="editColorLabel">Farbe</span>
+                  ${_hslPaletteHtml(this._editStoreColor, "editStoreColor")}
+                </div>
+                <div class="modal-actions">
+                  <button type="button" class="ghost" id="editStoreCancel">Abbrechen</button>
+                  <button type="button" id="editStoreSave">Speichern</button>
+                </div>
+              </div>
+            </div>`
+          : ""
+      }
     `;
 
     this._bindEvents();
@@ -1094,12 +1373,54 @@ class HassShoppingListStoresCard extends HTMLElement {
     if (addStoreBtn) {
       addStoreBtn.addEventListener("click", () => this._addStore());
     }
+    this._bindPalette(root, "newStoreColor", (color) => {
+      this._draftStoreColor = color;
+    });
+
     root.querySelectorAll(".store-row").forEach((row) => {
       const storeId = row.getAttribute("data-store-id");
-      row.querySelector(".store-remove")?.addEventListener("click", () =>
-        this._removeStore(storeId)
-      );
+      const store = (this._data?.stores || []).find((s) => s.store_id === storeId);
+      row.querySelector(".store-remove")?.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._removeStore(storeId);
+      });
+      const main = row.querySelector(".store-main");
+      if (main && store) {
+        main.addEventListener("click", () => this._openEditStore(store));
+        main.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this._openEditStore(store);
+          }
+        });
+      }
     });
+
+    const backdrop = root.getElementById("editStoreBackdrop");
+    if (backdrop) {
+      backdrop.addEventListener("click", (ev) => {
+        if (ev.target === backdrop) this._closeEditStore();
+      });
+      const editName = root.getElementById("editStoreName");
+      if (editName) {
+        editName.addEventListener("input", (ev) => {
+          this._editStoreName = ev.target.value;
+        });
+        editName.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") this._saveEditStore();
+          if (ev.key === "Escape") this._closeEditStore();
+        });
+      }
+      this._bindPalette(root, "editStoreColor", (color) => {
+        this._editStoreColor = color;
+      });
+      root
+        .getElementById("editStoreCancel")
+        ?.addEventListener("click", () => this._closeEditStore());
+      root
+        .getElementById("editStoreSave")
+        ?.addEventListener("click", () => this._saveEditStore());
+    }
   }
 }
 
@@ -1139,7 +1460,7 @@ if (
     type: "hass-shopping-list-stores-card",
     name: "Läden / Stores (hass-shopping-list)",
     description:
-      "Manage stores — Läden anlegen und löschen for hass-shopping-list.",
+      "Manage stores — Läden anlegen, Farbe wählen und bearbeiten for hass-shopping-list.",
     preview: true,
     documentationURL:
       "https://github.com/MartinSchillinger/hass-shopping-list#lovelace-cards--add-to-a-dashboard",

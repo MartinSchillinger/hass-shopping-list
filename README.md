@@ -67,7 +67,7 @@ Both cards ship in one module. Types:
 | Card type | Purpose |
 |-----------|---------|
 | `custom:hass-shopping-list-card` | Shopping list: add items, filter by store, check off / delete, tap item to edit |
-| `custom:hass-shopping-list-stores-card` | Manage stores (Läden): add / delete |
+| `custom:hass-shopping-list-stores-card` | Manage stores (Läden): add / edit (incl. color) / delete |
 
 The integration serves the script at `/hass_shopping_list/hass-shopping-list-card.js` and auto-registers it so Lovelace **awaits** the module before rendering (avoids “Custom element doesn't exist” after restart). The script pushes entries to `window.customCards` so both appear under **Add card → By card / Nach Karte**.
 
@@ -120,14 +120,17 @@ If `list_id` is omitted on the list card, it uses the first available list and l
 | Checkbox / ✕ | Check off or remove an item |
 | Tap item name / badge | Open a small modal to edit name and store (Save / Cancel) |
 
-Store badges stay visible on each row. Store catalog management lives on the separate stores card.
+Store badges stay visible on each row and use the store’s color (readable contrast on dark HA themes). Stores without a color use a slate default. Store catalog management lives on the separate stores card.
 
 ### Stores card usage
 
 | On the card | What it does |
 |-------------|--------------|
-| Name + **Laden anlegen** | Create a store (`add_store`) |
+| Name + **color swatches** + **Laden anlegen** | Create a store with a badge color (`add_store`) |
+| Tap a store row | Edit name and color in a modal (`update_store`) |
 | ✕ on a store row | Delete with confirmation (`remove_store`) |
+
+**Set a store color:** open the **Läden / Stores** card → pick a swatch under the name field → **Laden anlegen**. To change later, tap the store → choose another color → **Speichern**.
 
 Phone-first layout: the list add form stacks vertically on narrow screens.
 
@@ -148,6 +151,7 @@ Domain: `hass_shopping_list`
 | `add_item` | Add item (`list_id`, `name`, optional `store_id`, `quantity`, `note`) |
 | `set_item_store` | Set/clear store on an item (`item_id`, `store_id`) |
 | `add_store` | Add store (`name`, optional `icon`, `color`) |
+| `update_store` | Update store (`store_id`, optional `name` / `icon` / `color`) |
 | `list_stores` | Return store catalog (response-only) |
 | `remove_store` | Remove store and clear it from items |
 | `create_list` | Create list (`name`, optional `default_store_id`) |
@@ -164,6 +168,14 @@ service: hass_shopping_list.add_store
 data:
   name: Aldi
   icon: mdi:store
+  color: "#1e88e5"
+```
+
+```yaml
+service: hass_shopping_list.update_store
+data:
+  store_id: YOUR_STORE_ID
+  color: "#43a047"
 ```
 
 ```yaml

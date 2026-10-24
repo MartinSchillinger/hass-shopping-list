@@ -7,7 +7,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from custom_components.hass_shopping_list.const import STORAGE_KEY, STORAGE_VERSION
-from custom_components.hass_shopping_list.store import ShoppingListStore
+from custom_components.hass_shopping_list.store import (
+    DEFAULT_STORE_COLOR,
+    ShoppingListStore,
+    resolve_store_color,
+)
 
 
 @pytest.mark.asyncio
@@ -38,9 +42,37 @@ async def test_store_roundtrip_lists_stores_items(hass: HomeAssistant) -> None:
     assert reloaded.lists[0]["allowed_users"] == []
     assert len(reloaded.stores) == 1
     assert reloaded.stores[0]["name"] == "Aldi"
+    assert reloaded.stores[0]["color"] == "#00a"
     assert len(reloaded.items) == 1
     assert reloaded.items[0]["name"] == "Milk"
     assert reloaded.items[0]["store_id"] == shop["store_id"]
+
+
+@pytest.mark.asyncio
+async def test_update_store_color_and_default(hass: HomeAssistant) -> None:
+    """update_store persists color; missing color resolves to default."""
+    store = ShoppingListStore(hass)
+    await store.async_load()
+    shop = await store.async_add_store("Aldi")
+    assert shop["color"] is None
+    assert resolve_store_color(shop) == DEFAULT_STORE_COLOR
+
+    updated = await store.async_update_store(
+        shop["store_id"], name="Aldi Nord", color="#1e88e5"
+    )
+    assert updated["name"] == "Aldi Nord"
+    assert updated["color"] == "#1e88e5"
+
+    reloaded = ShoppingListStore(hass)
+    await reloaded.async_load()
+    entry = reloaded.get_store(shop["store_id"])
+    assert entry["name"] == "Aldi Nord"
+    assert entry["color"] == "#1e88e5"
+    assert resolve_store_color(entry) == "#1e88e5"
+
+    cleared = await reloaded.async_update_store(shop["store_id"], color=None)
+    assert cleared["color"] is None
+    assert resolve_store_color(cleared) == DEFAULT_STORE_COLOR
 
 
 @pytest.mark.asyncio
