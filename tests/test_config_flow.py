@@ -13,8 +13,20 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.hass_shopping_list.const import DOMAIN
 
 
+@pytest.fixture
+def skip_frontend_registration():
+    """Avoid registering the card JS during config-flow-only tests."""
+    with patch(
+        "custom_components.hass_shopping_list._async_register_frontend",
+        return_value=None,
+    ):
+        yield
+
+
 @pytest.mark.asyncio
-async def test_config_flow_user_form(hass: HomeAssistant) -> None:
+async def test_config_flow_user_form(
+    hass: HomeAssistant, skip_frontend_registration: None
+) -> None:
     """User step shows a form with no cloud fields."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -26,7 +38,9 @@ async def test_config_flow_user_form(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_config_flow_user_creates_entry(hass: HomeAssistant) -> None:
+async def test_config_flow_user_creates_entry(
+    hass: HomeAssistant, skip_frontend_registration: None
+) -> None:
     """Submitting the user step creates a single local config entry."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -50,7 +64,9 @@ async def test_config_flow_user_creates_entry(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_config_flow_abort_if_already_configured(hass: HomeAssistant) -> None:
+async def test_config_flow_abort_if_already_configured(
+    hass: HomeAssistant, skip_frontend_registration: None
+) -> None:
     """Second setup aborts — only one integration instance."""
     entry = MockConfigEntry(domain=DOMAIN, title="Shopping Lists", data={}, unique_id=DOMAIN)
     entry.add_to_hass(hass)

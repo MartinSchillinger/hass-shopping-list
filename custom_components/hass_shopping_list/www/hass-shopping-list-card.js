@@ -1,7 +1,13 @@
 /**
  * Lovelace card for hass_shopping_list — phone-first main control surface.
  * Items, store badges/filter, store picker on add, and store management.
+ * Loaded as a Lovelace module resource (or frontend extra module fallback).
  */
+console.info(
+  "%c HASS-SHOPPING-LIST-CARD %c loaded ",
+  "background:#388e3c;color:#fff;font-weight:bold",
+  "background:transparent;color:inherit"
+);
 class HassShoppingListCard extends HTMLElement {
   // No visual editor yet — HA falls back to the YAML editor in the picker.
   static getStubConfig() {
