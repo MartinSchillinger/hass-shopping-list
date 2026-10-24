@@ -38,12 +38,18 @@ def test_lovelace_card_file_defines_custom_element() -> None:
 
     assert 'customElements.define("hass-shopping-list-card"' in source
     assert 'type: "hass-shopping-list-card"' in source
+    assert "window.customCards" in source
+    assert "Shopping" in source  # picker search for "shop"
+    assert "Einkauf" in source
+    assert "hass-shopping-list" in source
     assert 'type: "hass_shopping_list/get_data"' in source
     assert '"hass_shopping_list_updated"' in source
     assert 'id="filterStore"' in source
     assert "All stores" in source
     assert 'class="badge"' in source
     assert 'callService("hass_shopping_list", "add_item"' in source
+    # Broken visual editor stub must not be registered (picker falls back to YAML).
+    assert "hass-shopping-list-card-editor" not in source
 
 
 @pytest.mark.asyncio
