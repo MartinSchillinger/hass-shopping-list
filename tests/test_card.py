@@ -37,15 +37,20 @@ _websocket_get_data = inspect.unwrap(websocket_get_data)
 
 
 def test_lovelace_card_file_defines_custom_element() -> None:
-    """Card JS registers the custom element and store filter UI."""
+    """Card JS registers list + stores elements and picker metadata."""
     assert CARD_PATH.is_file()
     source = CARD_PATH.read_text(encoding="utf-8")
 
     assert 'customElements.define("hass-shopping-list-card"' in source
+    assert "HassShoppingListStoresCard" in source
+    assert 'customElements.define(\n    "hass-shopping-list-stores-card"' in source
     assert 'type: "hass-shopping-list-card"' in source
+    assert 'type: "hass-shopping-list-stores-card"' in source
     assert "window.customCards" in source
     assert "Shopping" in source  # picker search for "shop"
     assert "Einkauf" in source
+    assert "Läden" in source or "Laden" in source
+    assert "Stores" in source
     assert "hass-shopping-list" in source
     assert 'type: "hass_shopping_list/get_data"' in source
     assert '"hass_shopping_list_updated"' in source
@@ -53,6 +58,13 @@ def test_lovelace_card_file_defines_custom_element() -> None:
     assert "All stores" in source
     assert 'class="badge"' in source
     assert 'callService("hass_shopping_list", "add_item"' in source
+    assert 'callService("hass_shopping_list", "add_store"' in source
+    # Edit modal on the list card (no per-row store dropdown).
+    assert 'id="editName"' in source
+    assert 'id="editStore"' in source
+    assert 'id="editSave"' in source
+    assert "itemStore" not in source
+    assert "Läden verwalten" not in source
     # Broken visual editor stub must not be registered (picker falls back to YAML).
     assert "hass-shopping-list-card-editor" not in source
 
@@ -70,18 +82,24 @@ def test_card_preserves_input_focus_across_updates() -> None:
     assert "_restoreFocus" in source
     assert "this._restoreFocus(focus)" in source
 
-    # hass setter must not re-render once subscribed (data comes via event → _load).
-    hass_setter = source.split("set hass(hass)", 1)[1].split(
-        "getCardSize(", 1
-    )[0]
-    assert "this._render()" not in hass_setter
-    assert "Do not re-render on every hass property update" in hass_setter
+    # Both cards: hass setter must not re-render once subscribed.
+    assert source.count("Do not re-render on every hass property update") >= 2
+    for marker in (
+        "class HassShoppingListCard extends HTMLElement",
+        "class HassShoppingListStoresCard extends HTMLElement",
+    ):
+        block = source.split(marker, 1)[1]
+        hass_setter = block.split("set hass(hass)", 1)[1].split(
+            "getCardSize(", 1
+        )[0]
+        assert "this._render()" not in hass_setter
 
     # Draft inputs update local state only — no _render on each keystroke.
     assert 'newName.addEventListener("input"' in source
     assert 'newStoreName.addEventListener("input"' in source
     assert 'this._draftName = ev.target.value' in source
     assert 'this._draftStoreName = ev.target.value' in source
+    assert 'this._editName = ev.target.value' in source
 
 
 @pytest.mark.asyncio
