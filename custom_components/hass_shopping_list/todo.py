@@ -54,7 +54,8 @@ async def async_setup_entry(
         for list_id in list(known):
             if list_id not in current_ids:
                 entity = known.pop(list_id)
-                hass.async_create_task(entity.async_remove())
+                # force_remove: drop registry-backed state so the entity disappears
+                hass.async_create_task(entity.async_remove(force_remove=True))
 
     _sync_entities()
     config_entry.async_on_unload(data.async_add_listener(_sync_entities))
