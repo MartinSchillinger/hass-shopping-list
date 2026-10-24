@@ -1,0 +1,66 @@
+# Free GitHub Actions release pipeline (public-repo minutes; GITHUB_TOKEN only).
+# On every push to main: SemVer tag vX.Y.Z + GitHub Release + manifest sync.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Skip the follow-up push from this workflow's chore(release) commit.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          NEXT="$(python3 .github/scripts/next_version.py)"
+          echo "next=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "Next version: ${NEXT}"
+
+      - name: Skip when nothing to release
+        if: steps.version.outputs.next == 'SKIP'
+        run: echo "No commits since last tag — skipping release."
+
+      - name: Bump manifest.json
+        if: steps.version.outputs.next != 'SKIP'
+        run: python3 .github/scripts/bump_manifest_version.py "${{ steps.version.outputs.next }}"
+
+      - name: Commit, tag, and push
+        if: steps.version.outputs.next != 'SKIP'
+        id: publish
+        env:
+          VERSION: ${{ steps.version.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/hass_shopping_list/manifest.json
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin HEAD:main
+          git push origin "v${VERSION}"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.next != 'SKIP'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.publish.outputs.tag }}
+          name: ${{ steps.publish.outputs.tag }}
+          generate_release_notes: true

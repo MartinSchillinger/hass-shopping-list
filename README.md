@@ -150,6 +150,28 @@ pip install -r requirements_test.txt
 pytest
 ```
 
+## Releases
+
+Every push/merge to `main` runs a free **GitHub Actions** workflow (`.github/workflows/release.yml`) that:
+
+1. Picks the next **SemVer** and creates tag `vX.Y.Z`
+2. Opens a **GitHub Release** with auto-generated notes (commits since the previous tag)
+3. Writes that version into `custom_components/hass_shopping_list/manifest.json` (the Lovelace card `?v=` cache-buster reads the same field)
+
+**First release:** if no `v*` tags exist yet, the version is **`0.1.0`**.
+
+**Bump rules** (conventional commits, with a safe fallback):
+
+| Commits since last tag | Bump |
+|------------------------|------|
+| `BREAKING CHANGE:` footer or `type!:` / `type(scope)!:` | major |
+| at least one `feat:` / `feat(scope):` | minor |
+| anything else (`fix:`, `chore:`, plain English, merge commits, …) | **patch** (default) |
+
+Examples: `feat: add share UI` → minor; `fix: restore input focus` → patch; unclear history → patch.
+
+No paid runners or third-party SaaS — only `GITHUB_TOKEN`, `actions/checkout`, and `softprops/action-gh-release`.
+
 ## Roadmap
 
 - **Slice 1:** default-store UX, sharing ACL enforcement, share UI  
