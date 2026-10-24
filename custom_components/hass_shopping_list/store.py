@@ -22,6 +22,28 @@ def _new_id() -> str:
     return uuid.uuid4().hex
 
 
+# Sentinel so update_store can clear icon/color with None vs leave unchanged.
+_UNSET = object()
+
+# Default badge color when a store has no color set (legacy / omitted).
+DEFAULT_STORE_COLOR = "#546e7a"
+
+
+def _normalize_color(color: str | None) -> str | None:
+    """Normalize optional CSS color; empty string becomes None."""
+    if color is None:
+        return None
+    stripped = str(color).strip()
+    return stripped or None
+
+
+def resolve_store_color(store: dict[str, Any] | None) -> str:
+    """Return a display color for a store (explicit or sensible default)."""
+    if not store:
+        return DEFAULT_STORE_COLOR
+    return _normalize_color(store.get("color")) or DEFAULT_STORE_COLOR
+
+
 class ShoppingListStore:
     """In-memory shopping data backed by HA `.storage/` JSON."""
 
@@ -159,12 +181,37 @@ class ShoppingListStore:
             "store_id": _new_id(),
             "name": name.strip(),
             "icon": icon,
-            "color": color,
+            "color": _normalize_color(color),
             "sort_order": len(self.stores),
         }
         self.stores.append(entry)
         await self.async_save()
         self._async_notify("add_store", store_id=entry["store_id"])
+        return deepcopy(entry)
+
+    async def async_update_store(
+        self,
+        store_id: str,
+        *,
+        name: str | None = None,
+        icon: str | None | object = _UNSET,
+        color: str | None | object = _UNSET,
+    ) -> dict[str, Any]:
+        """Update name / icon / color on an existing store."""
+        entry = self.get_store(store_id)
+        if entry is None:
+            raise KeyError(f"Store '{store_id}' not found")
+        if name is not None:
+            stripped = name.strip()
+            if not stripped:
+                raise ValueError("Store name must not be empty")
+            entry["name"] = stripped
+        if icon is not _UNSET:
+            entry["icon"] = icon
+        if color is not _UNSET:
+            entry["color"] = _normalize_color(color)  # type: ignore[arg-type]
+        await self.async_save()
+        self._async_notify("update_store", store_id=store_id)
         return deepcopy(entry)
 
     async def async_remove_store(self, store_id: str) -> None:

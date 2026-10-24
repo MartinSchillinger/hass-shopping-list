@@ -30,6 +30,7 @@ from .const import (
     SERVICE_REMOVE_STORE,
     SERVICE_RENAME_LIST,
     SERVICE_SET_ITEM_STORE,
+    SERVICE_UPDATE_STORE,
 )
 from .store import ShoppingListStore
 
@@ -72,6 +73,24 @@ async def _async_add_store(call: ServiceCall) -> dict[str, Any]:
         icon=call.data.get(ATTR_ICON),
         color=call.data.get(ATTR_COLOR),
     )
+    return {"store": store}
+
+
+async def _async_update_store(call: ServiceCall) -> dict[str, Any]:
+    data = _store(call.hass)
+    kwargs: dict[str, Any] = {}
+    if ATTR_NAME in call.data:
+        kwargs["name"] = call.data[ATTR_NAME]
+    if ATTR_ICON in call.data:
+        kwargs["icon"] = call.data[ATTR_ICON]
+    if ATTR_COLOR in call.data:
+        kwargs["color"] = call.data[ATTR_COLOR]
+    try:
+        store = await data.async_update_store(call.data[ATTR_STORE_ID], **kwargs)
+    except KeyError as err:
+        raise ServiceValidationError(str(err)) from err
+    except ValueError as err:
+        raise ServiceValidationError(str(err)) from err
     return {"store": store}
 
 
@@ -160,6 +179,20 @@ def async_register_services(hass: HomeAssistant) -> None:
         schema=vol.Schema(
             {
                 vol.Required(ATTR_NAME): cv.string,
+                vol.Optional(ATTR_ICON): vol.Any(cv.string, None),
+                vol.Optional(ATTR_COLOR): vol.Any(cv.string, None),
+            }
+        ),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_STORE,
+        _async_update_store,
+        schema=vol.Schema(
+            {
+                vol.Required(ATTR_STORE_ID): cv.string,
+                vol.Optional(ATTR_NAME): cv.string,
                 vol.Optional(ATTR_ICON): vol.Any(cv.string, None),
                 vol.Optional(ATTR_COLOR): vol.Any(cv.string, None),
             }

@@ -179,6 +179,37 @@ async def test_remove_store_service(
 
 
 @pytest.mark.asyncio
+async def test_update_store_service_color(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """update_store changes color via service; list_stores reflects it."""
+    store_resp = await hass.services.async_call(
+        DOMAIN,
+        "add_store",
+        {"name": "Lidl", "color": "#fb8c00"},
+        blocking=True,
+        return_response=True,
+    )
+    store_id = store_resp["store"]["store_id"]
+    assert store_resp["store"]["color"] == "#fb8c00"
+
+    updated = await hass.services.async_call(
+        DOMAIN,
+        "update_store",
+        {"store_id": store_id, "color": "#43a047"},
+        blocking=True,
+        return_response=True,
+    )
+    assert updated["store"]["color"] == "#43a047"
+
+    stores = await hass.services.async_call(
+        DOMAIN, "list_stores", {}, blocking=True, return_response=True
+    )
+    match = next(s for s in stores["stores"] if s["store_id"] == store_id)
+    assert match["color"] == "#43a047"
+
+
+@pytest.mark.asyncio
 async def test_set_item_store_invalid_item_raises(
     hass: HomeAssistant, setup_integration: MockConfigEntry
 ) -> None:
