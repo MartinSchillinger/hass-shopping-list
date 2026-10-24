@@ -52,6 +52,33 @@ def test_lovelace_card_file_defines_custom_element() -> None:
     assert "hass-shopping-list-card-editor" not in source
 
 
+def test_card_preserves_input_focus_across_updates() -> None:
+    """Add/store text inputs must not be destroyed by routine hass updates.
+
+    Regression: set hass() used to call _render() on every HA state push,
+    replacing shadowRoot.innerHTML and stealing focus while typing.
+    """
+    source = CARD_PATH.read_text(encoding="utf-8")
+
+    # Focus capture/restore around full re-renders (websocket/_load, UI actions).
+    assert "_captureFocus" in source
+    assert "_restoreFocus" in source
+    assert "this._restoreFocus(focus)" in source
+
+    # hass setter must not re-render once subscribed (data comes via event → _load).
+    hass_setter = source.split("set hass(hass)", 1)[1].split(
+        "getCardSize(", 1
+    )[0]
+    assert "this._render()" not in hass_setter
+    assert "Do not re-render on every hass property update" in hass_setter
+
+    # Draft inputs update local state only — no _render on each keystroke.
+    assert 'newName.addEventListener("input"' in source
+    assert 'newStoreName.addEventListener("input"' in source
+    assert 'this._draftName = ev.target.value' in source
+    assert 'this._draftStoreName = ev.target.value' in source
+
+
 @pytest.mark.asyncio
 async def test_websocket_get_data_for_card(
     hass: HomeAssistant,
