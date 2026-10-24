@@ -35,14 +35,19 @@ The Lovelace card is registered automatically by the integration (`/hass_shoppin
 
 Card type: `custom:hass-shopping-list-card`
 
-### Via UI
+The integration serves the card at `/hass_shopping_list/hass-shopping-list-card.js` and registers it with `frontend.add_extra_js_url` (loaded as a frontend module). The script pushes an entry to `window.customCards` so it appears under **Add card → By card / Nach Karte** (Community / custom cards).
 
-1. Open a dashboard → **Edit** → **Add card**  
-2. Search for **Einkaufsliste (Läden)** / `hass-shopping-list-card`  
-3. Optionally set `title`, `list_id`, `show_completed`  
-4. Save
+### Via UI (card picker)
 
-### Via YAML
+1. Integration must be added (Settings → Devices & services → **Shopping Lists (stores)**), then **restart Home Assistant** once after install/update  
+2. Hard-reload the browser (Ctrl+Shift+R / Cmd+Shift+R) so the new JS loads  
+3. Dashboard → **Edit** → **Add card** → **By card** / **Nach Karte**  
+4. Search **shop**, **Einkauf**, **Laden**, or **hass-shopping-list** — pick **Einkaufsliste / Shopping List …**  
+5. Optionally set `title`, `list_id`, `show_completed` → Save  
+
+If search still finds nothing: open `/hass_shopping_list/hass-shopping-list-card.js` in the browser (should show JS source). In DevTools console, check `window.customCards` for `type: "hass-shopping-list-card"`. Or add via Manual YAML (below).
+
+### Via YAML (Manual)
 
 ```yaml
 views:

@@ -3,12 +3,9 @@
  * Items, store badges/filter, store picker on add, and store management.
  */
 class HassShoppingListCard extends HTMLElement {
-  static getConfigElement() {
-    return document.createElement("hass-shopping-list-card-editor");
-  }
-
+  // No visual editor yet — HA falls back to the YAML editor in the picker.
   static getStubConfig() {
-    return { list_id: "", title: "Einkaufsliste" };
+    return { list_id: "", title: "Einkaufsliste", show_completed: false };
   }
 
   setConfig(config) {
@@ -718,13 +715,24 @@ class HassShoppingListCard extends HTMLElement {
   }
 }
 
-customElements.define("hass-shopping-list-card", HassShoppingListCard);
+// Guard re-define when HA loads the module more than once (extra_module_url + cache).
+if (!customElements.get("hass-shopping-list-card")) {
+  customElements.define("hass-shopping-list-card", HassShoppingListCard);
+}
 
+// Lovelace “Add card” / “Nach Karte” picker reads window.customCards.
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "hass-shopping-list-card",
-  name: "Einkaufsliste (Läden)",
-  description:
-    "Mehrere Listen mit Laden-Zuordnung, Filter und Laden-Verwaltung — alles in einer Card.",
-  preview: true,
-});
+if (
+  !window.customCards.some((c) => c && c.type === "hass-shopping-list-card")
+) {
+  window.customCards.push({
+    type: "hass-shopping-list-card",
+    // Include DE + EN terms so search for “shop”, “einkauf”, “laden” finds it.
+    name: "Einkaufsliste / Shopping List (Läden, hass-shopping-list)",
+    description:
+      "Shopping list with stores — Einkaufsliste mit Laden-Zuordnung, Filter und Laden-Verwaltung (hass-shopping-list).",
+    preview: true,
+    documentationURL:
+      "https://github.com/MartinSchillinger/hass-shopping-list#lovelace-card--add-to-a-dashboard",
+  });
+}
