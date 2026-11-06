@@ -14,6 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .split_summary import parse_voice_item_summary, resolve_store_id
 from .store import ShoppingListStore
 
 
@@ -149,14 +150,28 @@ class ShoppingListTodoEntity(TodoListEntity):
         return results
 
     async def async_create_todo_item(self, item: TodoItem) -> None:
-        """Add an item via the todo platform."""
+        """Add an item via the todo platform.
+
+        Voice intents often pack several products into one summary
+        ("Butter und Milch") and optionally a store ("… im Aldi").
+        Split on commas and und/and; attach a matching existing store.
+        """
         try:
-            await self._data.async_add_item(
-                self._list_id,
-                item.summary or "",
-                complete=item.status == TodoItemStatus.COMPLETED,
-                note=item.description,
+            store_names = [s["name"] for s in self._data.stores if s.get("name")]
+            names, store_name = parse_voice_item_summary(
+                item.summary or "", store_names
             )
+            store_id = resolve_store_id(store_name, self._data.stores)
+            complete = item.status == TodoItemStatus.COMPLETED
+            note = item.description
+            for name in names:
+                await self._data.async_add_item(
+                    self._list_id,
+                    name,
+                    complete=complete,
+                    note=note,
+                    store_id=store_id,
+                )
         except KeyError as err:
             raise HomeAssistantError(str(err)) from err
 

@@ -161,3 +161,160 @@ async def test_todo_create_update_complete_delete_items(
 
     state = hass.states.get(entity_id)
     assert all(i["uid"] != item["uid"] for i in state.attributes["shopping_items"])
+
+@pytest.mark.asyncio
+async def test_todo_create_splits_und_and_commas(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Creating via todo.add_item splits "Butter und Milch" into two items."""
+    lists = await hass.services.async_call(
+        DOMAIN, "list_lists", {}, blocking=True, return_response=True
+    )
+    list_id = next(lst["list_id"] for lst in lists["lists"] if lst["name"] == "Shopping")
+    entity_id = _entity_for_list(hass, list_id)
+
+    await hass.services.async_call(
+        "todo",
+        "add_item",
+        {"entity_id": entity_id, "item": "Butter und Milch"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    names = [i["name"] for i in state.attributes["shopping_items"]]
+    assert names.count("Butter") == 1
+    assert names.count("Milch") == 1
+    assert "Butter und Milch" not in names
+
+
+@pytest.mark.asyncio
+async def test_todo_create_splits_comma_list_keeps_ampersand(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Comma lists split; ampersand names stay a single item."""
+    lists = await hass.services.async_call(
+        DOMAIN, "list_lists", {}, blocking=True, return_response=True
+    )
+    list_id = next(lst["list_id"] for lst in lists["lists"] if lst["name"] == "Shopping")
+    entity_id = _entity_for_list(hass, list_id)
+
+    await hass.services.async_call(
+        "todo",
+        "add_item",
+        {"entity_id": entity_id, "item": "Eier, Mehl und Zucker"},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        "todo",
+        "add_item",
+        {"entity_id": entity_id, "item": "Ben & Jerry's"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    names = [i["name"] for i in state.attributes["shopping_items"]]
+    assert names.count("Eier") == 1
+    assert names.count("Mehl") == 1
+    assert names.count("Zucker") == 1
+    assert names.count("Ben & Jerry's") == 1
+
+
+@pytest.mark.asyncio
+async def test_todo_create_single_item_unchanged(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """A single product name still creates exactly one item."""
+    lists = await hass.services.async_call(
+        DOMAIN, "list_lists", {}, blocking=True, return_response=True
+    )
+    list_id = next(lst["list_id"] for lst in lists["lists"] if lst["name"] == "Shopping")
+    entity_id = _entity_for_list(hass, list_id)
+
+    await hass.services.async_call(
+        "todo",
+        "add_item",
+        {"entity_id": entity_id, "item": "Milch"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    names = [i["name"] for i in state.attributes["shopping_items"]]
+    assert names == ["Milch"]
+
+@pytest.mark.asyncio
+async def test_todo_create_assigns_existing_store_from_phrase(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Voice-like summary with "im Aldi" sets store_id on all split items."""
+    lists = await hass.services.async_call(
+        DOMAIN, "list_lists", {}, blocking=True, return_response=True
+    )
+    list_id = next(lst["list_id"] for lst in lists["lists"] if lst["name"] == "Shopping")
+    entity_id = _entity_for_list(hass, list_id)
+
+    store = await hass.services.async_call(
+        DOMAIN,
+        "add_store",
+        {"name": "Aldi"},
+        blocking=True,
+        return_response=True,
+    )
+    store_id = store["store"]["store_id"]
+
+    await hass.services.async_call(
+        "todo",
+        "add_item",
+        {"entity_id": entity_id, "item": "Eier und Butter im Aldi"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    items = {i["name"]: i for i in state.attributes["shopping_items"]}
+    assert set(items) == {"Eier", "Butter"}
+    assert items["Eier"]["store_id"] == store_id
+    assert items["Butter"]["store_id"] == store_id
+    assert items["Eier"]["store_name"] == "Aldi"
+
+
+@pytest.mark.asyncio
+async def test_todo_create_unknown_store_phrase_unchanged(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Unknown store phrase is not stripped and no store is assigned."""
+    lists = await hass.services.async_call(
+        DOMAIN, "list_lists", {}, blocking=True, return_response=True
+    )
+    list_id = next(lst["list_id"] for lst in lists["lists"] if lst["name"] == "Shopping")
+    entity_id = _entity_for_list(hass, list_id)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "add_store",
+        {"name": "Lidl"},
+        blocking=True,
+        return_response=True,
+    )
+
+    await hass.services.async_call(
+        "todo",
+        "add_item",
+        {"entity_id": entity_id, "item": "Milch im Aldi"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    items = state.attributes["shopping_items"]
+    assert len(items) == 1
+    assert items[0]["name"] == "Milch im Aldi"
+    assert items[0]["store_id"] is None
+
